@@ -16,6 +16,10 @@ go run . < input.txt
 ```
 unless I've accidentally named the input file something else.
 
+Alternatively, there's a naive Makefile that, as of this writing, assumes all
+exercises are completed in Go and attempts to run them all. Just run `make`
+in the project root.
+
 ## Caveats
 
 This is slapdash code, with only as much effort put into it as required to

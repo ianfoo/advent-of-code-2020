@@ -85,7 +85,7 @@ func findTwoSumTerms(target int, ints []int) ([2]int, error) {
 	return [2]int{}, fmt.Errorf("no terms sum to %d", target)
 }
 
-// findThreeSumTerm scans the list of input for three terms that add up to the
+// findThreeSumTerms scans the list of input for three terms that add up to the
 // target, shortening its search each time since elements already checked as the
 // first terms will be disqualified from consideration.
 func findThreeSumTerms(target int, ints []int) ([3]int, error) {

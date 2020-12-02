@@ -19,7 +19,7 @@ func main() {
 }
 
 // Match password rule and password lines:
-// [min]-[max] [char]: [password]
+// [num1]-[num2] [char]: [password]
 var ruleAndPasswordRegexp = regexp.MustCompile(`(?P<num1>\d+)-(?P<num2>\d+) (?P<char>\w): (?P<password>\w+)$`)
 
 func run(r io.Reader) error {
@@ -103,7 +103,7 @@ func isValidForOldRules(pe PasswordEntry) bool {
 // provided.
 func isValidForNewRules(pe PasswordEntry) bool {
 	// Indices are 1-based in password file, so correct here!
-	index1, index2 := pe.num1 -1, pe.num2 - 1
+	index1, index2 := pe.num1-1, pe.num2-1
 
 	inPos1 := pe.password[index1] == pe.char[0]
 	inPos2 := pe.password[index2] == pe.char[0]
