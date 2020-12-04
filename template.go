@@ -59,13 +59,17 @@ func readInput(r io.Reader) ([]string, error) {
 }
 
 func part1(input []string) (int, error) {
-	// Write the code to complete part one of the puzzle here.
 	var result int
+
+	// Write the code to complete part one of the puzzle here.
+
 	return result, nil
 }
 
 func part2(input []string) (int, error) {
-	// Write the code to complete part two of the puzzle here.
 	var result int
+
+	// Write the code to complete part two of the puzzle here.
+
 	return result, nil
 }
