@@ -22,7 +22,8 @@ func main() {
 	flag.BoolVar(&verbose, "verbose", false, "Print more detail.")
 	flag.Parse()
 
-	fmt.Println("verbose:", verbose)
+	log.SetFlags(log.Ltime | log.Lmicroseconds)
+
 	if err := run(os.Stdin); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
@@ -69,74 +70,67 @@ func readInput(r io.Reader) ([]string, error) {
 	return input, nil
 }
 
-type CapacityForColor struct {
-	Number int
-	Color  string
-}
-
-var containmentRules map[string][]CapacityForColor
+var containmentRules map[string]map[string]int
 
 var (
-	rulePat        = regexp.MustCompile(`^(.+) contain (.+)$`)
-	containablePat = regexp.MustCompile(`^(\d+) (.+)$`)
+	rulePat        = regexp.MustCompile(`^(.+) bags contain (.+)$`)
+	containablePat = regexp.MustCompile(`^(\d+) (.+) bags?\.?$`)
 )
 
 func parseRules(input []string) error {
-	containmentRules = make(map[string][]CapacityForColor)
+	containmentRules = make(map[string]map[string]int)
 	for i, line := range input {
 		match := rulePat.FindStringSubmatch(line)
 		if len(match) != 3 {
 			return fmt.Errorf("unexpected container rule format: %q", line)
 		}
 
-		color := match[1]
-		color = strings.TrimSuffix(color, " bags")
+		containerColor := match[1]
+		sequence := i + 1
 
 		if strings.HasSuffix(line, "no other bags.") {
 			// Bags that cannot contain any other bags are 'leaf nodes" in the
 			// bag capacity tree. When they're encountered programmatically, it
 			// indicates the end of a recursion descention.
-			containmentRules[color] = nil
+			containmentRules[containerColor] = nil
+			trace("[%4d] rule: %s contains nothing\n", sequence, containerColor)
 			continue
 		}
 
 		containableStr := match[2]
-		containableStr = strings.Trim(containableStr, " .")
-		containableSet := strings.Split(containableStr, ", ")
-		trace("[%4d] %s contains %s\n", i+i, color, containableSet)
+		containableStr = strings.Trim(containableStr, " ")
+		containableList := strings.Split(containableStr, ", ")
+		trace("[%4d] rule: %s contains %s\n", sequence, containerColor, containableStr)
 
-		for _, containable := range containableSet {
-			c, err := parseCapacity(containable)
+		for _, containable := range containableList {
+			color, capacity, err := parseCapacityForColor(containable)
 			if err != nil {
 				return err
 			}
-			containmentRules[color] = append(containmentRules[color], c)
+			if _, ok := containmentRules[containerColor]; !ok {
+				containmentRules[containerColor] = make(map[string]int)
+			}
+			containmentRules[containerColor][color] = capacity
 		}
 	}
 	return nil
 }
 
-func parseCapacity(caStr string) (CapacityForColor, error) {
+func parseCapacityForColor(caStr string) (string, int, error) {
 	ruleParams := containablePat.FindStringSubmatch(caStr)
 	if len(ruleParams) != 3 {
-		return CapacityForColor{}, fmt.Errorf("unexpected capacity format: %q", caStr)
+		return "", 0, fmt.Errorf("unexpected capacity format: %q", caStr)
 	}
 
 	numStr := ruleParams[1]
 	num, err := strconv.Atoi(numStr)
 	if err != nil {
-		return CapacityForColor{}, fmt.Errorf("bad number %q in capacity: %w", numStr, err)
+		return "", 0, fmt.Errorf("bad number %q in capacity: %w", numStr, err)
 	}
 
 	color := ruleParams[2]
-	color = strings.TrimSuffix(color, " bag")
-	color = strings.TrimSuffix(color, " bags")
 
-	bagRule := CapacityForColor{
-		Number: num,
-		Color:  color,
-	}
-	return bagRule, nil
+	return color, num, nil
 }
 
 func Part1_HowManyColorsCanContain(targetColor string) int {
@@ -148,27 +142,20 @@ func Part1_HowManyColorsCanContain(targetColor string) int {
 			continue
 		}
 		if canContain(targetColor, r) {
-			// Current bag color can contain the target color bag, so add it to
-			// count.
-			count++
-
 			trace("[%4d] %q can contain %q", count, color, targetColor)
+			count++
 		}
 	}
 	return count
 }
 
-func canContain(
-	targetColor string,
-	containableBags []CapacityForColor,
-) bool {
+func canContain(targetColor string, containableBags map[string]int) bool {
 	isContainable := false
-	for _, c := range containableBags {
-		color := c.Color
+	for color := range containableBags {
 		if color == targetColor {
 			return true
 		}
-		subRules, ok := containmentRules[color]
+		subContainable, ok := containmentRules[color]
 		if !ok {
 			// I would normally send an error back up instead of panic, but in
 			// this case cutting out excess error-handling simplifies the code
@@ -176,7 +163,7 @@ func canContain(
 			// worth it.
 			panic(fmt.Sprintf("unknown color %q", color))
 		}
-		isContainable = isContainable || canContain(targetColor, subRules)
+		isContainable = isContainable || canContain(targetColor, subContainable)
 	}
 	return isContainable
 }
@@ -198,9 +185,9 @@ func numberOfBagsForBagColor(color string) int {
 		panic(fmt.Sprintf("unknown color %q", color))
 	}
 	count := 1
-	for _, c := range containedBags {
-		numBagsInOneBag := numberOfBagsForBagColor(c.Color)
-		count += c.Number * numBagsInOneBag
+	for color, capacity := range containedBags {
+		numBagsInOneBag := numberOfBagsForBagColor(color)
+		count += capacity * numBagsInOneBag
 	}
 	trace("One %q bag contains %d bags inside it", color, count-1)
 	return count
