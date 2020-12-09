@@ -3,76 +3,48 @@
 //
 // If no ID and/or no session token are provided, it will decode a JSON
 // blob that represents a leaderboard from stdin.
-package main
+package leaderboard
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 )
 
+const EnvVarAoCSession = "AOC_SESSION_TOKEN"
+
 // Determine format for leaderboard summary: how to show progress by day.
 // Track last-fetch time and last response, to keep from over-checking.
 
-func main() {
-	if err := run(); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
-	}
-}
-
-func run() error {
-	var (
-		leaderboardID uint
-		sessionCookie string
-	)
-	flag.UintVar(&leaderboardID, "id", 0, "private leaderboard ID")
-	flag.StringVar(&sessionCookie, "session", "", "session cookie value")
-	flag.Parse()
-
-	var (
-		reader = ioutil.NopCloser(os.Stdin)
-		err    error
-	)
-
-	// Fetch from internet if ID and session spcified.
-	if leaderboardID > 0 && sessionCookie != "" {
-		reader, err = fetchLeaderboard(http.DefaultClient, leaderboardID, sessionCookie)
-		if err != nil {
-			return fmt.Errorf("fetching leaderboard: %w", err)
-		}
-	}
-
-	var lb Leaderboard
-	if err := json.NewDecoder(reader).Decode(&lb); err != nil {
-		return fmt.Errorf("decoding leaderboard: %w", err)
-	}
-
-	fmt.Println(lb.Summary())
-	return nil
-}
-
-func fetchLeaderboard(client *http.Client, id uint, sessionCookie string) (io.ReadCloser, error) {
-	lbURL := fmt.Sprintf("https://adventofcode.com/2020/leaderboard/private/view/%d.json", id)
+func Fetch(client *http.Client, year uint, id uint, sessionCookie string) (Leaderboard, error) {
+	lbURL := fmt.Sprintf("https://adventofcode.com/%d/leaderboard/private/view/%d.json", year, id)
+	fmt.Println("feching from", lbURL)
 	r, err := http.NewRequest(http.MethodGet, lbURL, nil)
 	if err != nil {
-		return nil, err
+		return Leaderboard{}, err
 	}
 	r.AddCookie(&http.Cookie{Name: "session", Value: sessionCookie})
 
 	resp, err := client.Do(r)
 	if err != nil {
-		return nil, err
+		return Leaderboard{}, err
 	}
-	return resp.Body, nil
+
+	defer resp.Body.Close()
+	return FromReader(resp.Body)
+}
+
+func FromReader(r io.Reader) (Leaderboard, error) {
+	var lb Leaderboard
+	if err := json.NewDecoder(r).Decode(&lb); err != nil {
+		return Leaderboard{}, fmt.Errorf("decoding leaderboard: %w", err)
+	}
+	return lb, nil
 }
 
 type (
@@ -105,14 +77,18 @@ type (
 	}
 )
 
-func (lb Leaderboard) Summary() string {
+// String renders the Leaderboard as a a text table.
+func (lb Leaderboard) String() string {
+	if len(lb.Members) == 0 {
+		return ""
+	}
 	const (
 		headingPoints         = "POINTS"
 		headingMostRecentStar = "MOST RECENT STAR"
 		dateFormat            = "2006-01-02 15:04:05 -0700 MST"
 	)
 	var (
-		longest      = lb.LongestMemberNameLen()
+		longest      = lb.longestMemberNameLen()
 		headerFormat = fmt.Sprintf("%%-%ds  %s  %s\n", longest, headingPoints, headingMostRecentStar)
 		underline    = strings.Repeat("=", longest) + "  " +
 			strings.Repeat("=", len(headingPoints)) + "  " +
@@ -125,7 +101,7 @@ func (lb Leaderboard) Summary() string {
 	)
 	summary := fmt.Sprintf(headerFormat, "NAME")
 	summary += underline
-	for _, m := range lb.SortedMembers() {
+	for _, m := range lb.sortedMembers() {
 		lastStarTimestamp := fmt.Sprint(m.LastStarTimestamp)
 		if m.LastStarTimestamp.Unix() == 0 || m.LastStarTimestamp.IsZero() {
 			lastStarTimestamp = "(none)"
@@ -135,8 +111,8 @@ func (lb Leaderboard) Summary() string {
 	return summary
 }
 
-// LongestNameLen gets the length of the longest member name.
-func (lb Leaderboard) LongestMemberNameLen() int {
+// longestNameLen gets the length of the longest member name.
+func (lb Leaderboard) longestMemberNameLen() int {
 	max := 0
 	for _, v := range lb.Members {
 		if l := len(v.Name); l > max {
@@ -146,7 +122,9 @@ func (lb Leaderboard) LongestMemberNameLen() int {
 	return max
 }
 
-func (lb Leaderboard) SortedMembers() []Member {
+// sortedMembers returns the slice of members sorted in from most points to
+// least points.
+func (lb Leaderboard) sortedMembers() []Member {
 	members := make([]Member, 0, len(lb.Members))
 	for _, m := range lb.Members {
 		members = append(members, m)

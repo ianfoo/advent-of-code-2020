@@ -29,3 +29,11 @@ debugging is required. Advent of Code is as much an exercise for me to not
 get hung up on always making pristine production quality code when the
 situation does not call for it, instead optimizing for speed of
 implementation here, without sacrificing too much readability.
+
+## To Do
+
+* Merge old Advent of Code repository into this one, or vice versa. 
+  (Remember to update the Go module name.)
+* Re-jigger puzzles to be callable as functions from a Go driver program.
+  Return a tuple of answers, and optionally a description.
+* Run all puzzles from Go driver, and render results as text or JSON.

@@ -1,7 +1,7 @@
-// Use this template to jumpstart Go-based solutions for Advent of Code.
+{{- /* Use this template to jumpstart Go-based solutions for Advent of Code. */ -}}
 
-// This is a program that will compute the answers to both parts of the Day N
-// Advent of Code 2020 puzzle. (adventofcode.com/2020/day/N)
+// This is a program that will compute the answers to both parts of the Day {{ .Day }} 
+// Advent of Code {{ .Year }} puzzle. (adventofcode.com/{{ .Year }}/day/{{ .Day }})
 package main
 
 import (
@@ -12,9 +12,20 @@ import (
 )
 
 func main() {
+	flag.BoolVar(&verbose, "verbose", false, "Print more detail.")
+	flag.Parse()
+
+	log.SetFlags(log.Ltime | log.Lmicroseconds)
+
 	if err := run(os.Stdin); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
+	}
+}
+
+func trace(format string, params ...interface{}) {
+	if verbose {
+		log.Printf(format, params...)
 	}
 }
 
