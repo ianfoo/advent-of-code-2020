@@ -14,7 +14,7 @@ import (
 	"strconv"
 )
 
-// Sample data uses differnet value
+// Sample data uses differnet value, so allow it to be changed.
 const DefaultCypherSize = 25
 
 var (
@@ -81,54 +81,38 @@ func readInput(r io.Reader) ([]int, error) {
 	return input, nil
 }
 
-func convertToNumberList(in []string) ([]int, error) {
-	numbers := make([]int, 0, len(in))
-	for _, nStr := range in {
-		n, err := strconv.Atoi(nStr)
-		if err != nil {
-			return nil, err
-		}
-		numbers = append(numbers, n)
-	}
-	return numbers, nil
-}
-func buildSumTable(window []int) map[int]struct{} {
-	sumTable := make(map[int]struct{})
+func isValid(window []int, targetSum int) bool {
 	for i, x := range window {
 		for j := i + 1; j < len(window); j++ {
 			y := window[j]
-			sum := x + y
-			sumTable[sum] = struct{}{}
+			if sum := x + y; sum == targetSum {
+				return true
+			}
 		}
 	}
-	return sumTable
+	return false
 }
 
 func part1(input []int, cypherSize int) (int, error) {
-	// Read preamble.
-	numbers := input[:cypherSize:cypherSize]
-	trace("initial numbers: %v", numbers)
-
+	trace("input: %v", input)
 	for i := cypherSize; i < len(input); i++ {
-		// Calculate sums of all numbers in set
-		st := buildSumTable(numbers)
 
-		// Get next number.
-		n := input[i]
+		// Define window of input for building sums.
+		var (
+			lower = i - cypherSize
+			upper = i
+		)
+		window := input[lower : upper : cypherSize+lower]
+		trace("window: elements %d-%d: %v", lower, upper, window)
 
-		// Check validity of next number.
-		if _, present := st[n]; !present {
-			trace("%d not found in sum table on line %d", n, i+1)
+		// Check validity of number following window.
+		if n := input[i]; !isValid(window, n) {
+			trace("%d on line %d is not a sum of two entries in window", n, i+1)
 			return n, nil
 		}
-
-		// Adjust the numbers set to exclude oldest number and add new one.
-		numbers = append(numbers[1:cypherSize:cypherSize], n)
-		trace("new numbers: %v", numbers)
 	}
 
-	// Unreachable.
-	return 0, errors.New("unreachable code")
+	return 0, errors.New("no invalid data found")
 }
 
 func part2(input []int, targetSum int) (int, error) {
@@ -174,5 +158,5 @@ LOOP:
 		}
 	}
 
-	return 0, errors.New("unreachable code")
+	return 0, errors.New("no range matching sum found")
 }
