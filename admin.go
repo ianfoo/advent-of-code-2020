@@ -90,6 +90,28 @@ func run() error {
 // of Advent of Code, rendering a template with optional placeholders.
 // The us
 func BootstrapNewDay(c *cli.Context) error {
+
+	determineLikelyDay := func() (int, error) {
+		// Advent of Code releases new puzzles at midnight in the Eastern time
+		// zone of the USA.
+		loc, err := time.LoadLocation("America/New_York")
+		if err != nil {
+			return 0, fmt.Errorf("cannot determine day to init: %w", err)
+		}
+
+		now := time.Now().In(loc)
+
+		// If it's within an hour of the new puzzle dropping, set up for
+		// the next day. Otherwise set up for the current day.
+		day := now.Day()
+		if now.Hour() == 23 {
+			fmt.Println("Assuming bootstrap is for next day because of proximity")
+			day++
+		}
+
+		return day, nil
+	}
+
 	var (
 		year         = int(c.Uint("year"))
 		day          = int(c.Uint("day"))
@@ -98,20 +120,11 @@ func BootstrapNewDay(c *cli.Context) error {
 		noClobber    = !c.Bool("force")
 	)
 	if day == 0 {
-		loc, err := time.LoadLocation("America/New_York")
+		likely, err := determineLikelyDay()
 		if err != nil {
-			return fmt.Errorf("cannot determine day to init: %w", err)
+			return err
 		}
-
-		now := time.Now().In(loc)
-
-		// If it's within an hour of the new puzzle dropping, set up for
-		// the next day. Otherwise set up for the current day.
-		day = now.Day()
-		if now.Hour() == 23 {
-			fmt.Println("Assuming bootstrap is for next day because of proximity")
-			day++
-		}
+		day = likely
 	}
 
 	var (
