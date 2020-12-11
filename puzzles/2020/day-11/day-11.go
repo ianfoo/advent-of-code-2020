@@ -29,7 +29,7 @@ func main() {
 
 func trace(format string, params ...interface{}) {
 	if verbose {
-		log.Printf(format, params...)
+		fmt.Printf(format+"\n", params...)
 	}
 }
 
@@ -39,22 +39,26 @@ func run(r io.Reader) error {
 		return fmt.Errorf("reading input: %w", err)
 	}
 
+	var part1Result int
 	{
-		result, err := part1(input)
+		var err error
+		part1Result, err = part1(input)
 		if err != nil {
 			return fmt.Errorf("part 1: %w", err)
 		}
-		fmt.Printf("Part 1: %d\n", result)
 	}
 
+	var part2Result int
 	{
-		result, err := part2(input)
+		var err error
+		part2Result, err = part2(input)
 		if err != nil {
 			return fmt.Errorf("part 2: %w", err)
 		}
-		fmt.Printf("Part 2: %d\n", result)
 	}
 
+	fmt.Printf("Part 1: %d\n", part1Result)
+	fmt.Printf("Part 2: %d\n", part2Result)
 	return nil
 }
 
@@ -115,7 +119,7 @@ func nextIteration(
 				newRow.WriteRune('.')
 				continue
 			}
-			occ := occupiedCountAroundSeat(x, y, rows)
+			occ := occCalcFunc(x, y, rows)
 			var newSeat rune
 			switch {
 			case seat == 'L' && occ == 0:
@@ -135,14 +139,15 @@ func nextIteration(
 	return next, occupiedCount
 }
 
-func part1(rows []string) (int, error) {
+func part1(rows Rows) (int, error) {
 	var occupiedCount int
 
 	for numRounds := 0; ; numRounds++ {
 		var newOccupiedCount int
 		rows, newOccupiedCount = nextIteration(rows, occupiedCountAroundSeat, 4)
 
-		trace("after round %d: %d occupied seats", numRounds, occupiedCount)
+		trace("%v", rows)
+		trace("after round %d: %d occupied seats\n", numRounds+1, occupiedCount)
 		if newOccupiedCount == occupiedCount {
 			break
 		}
@@ -154,21 +159,9 @@ func part1(rows []string) (int, error) {
 
 func occupiedCountRays(x, y int, rows []string) int {
 	var occupied int
-	for i := y - 1; i <= y+1; i++ {
-		if i < 0 || i >= len(rows) {
-			// Out of bounds.
-			continue
-		}
-		for j := x - 1; j <= x+1; j++ {
-			if j < 0 || j >= len(rows[i]) {
-				// Out of bounds.
-				continue
-			}
-			if i == y && j == x {
-				// This is the seat we're summing around: skip it.
-				continue
-			}
-			nearestX, nearestY, err := findNearestSeatInDirection(x, y, j-x, i-y, rows)
+	for dirY := -1; dirY <= 1; dirY++ {
+		for dirX := -1; dirX <= 1; dirX++ {
+			nearestX, nearestY, err := findNearestSeatInDirection(x, y, dirX, dirY, rows)
 			if err != nil {
 				// No seat found in this direction, so continue.
 				continue
@@ -186,6 +179,9 @@ func findNearestSeatInDirection(x, y, dirX, dirY int, rows []string) (int, int, 
 		foundX int
 		foundY int
 	)
+	if dirX == 0 && dirY == 0 {
+		return 0, 0, errors.New("no direction provided")
+	}
 	for n := 1; ; n++ {
 		checkY := y + (n * dirY)
 		if checkY < 0 || checkY >= len(rows) {
@@ -198,7 +194,6 @@ func findNearestSeatInDirection(x, y, dirX, dirY int, rows []string) (int, int, 
 		}
 
 		checkSeat := rows[checkY][checkX]
-		trace("marker at (%d,%d): %c", checkX, checkY, checkSeat)
 		if checkSeat != '.' {
 			foundX = checkX
 			foundY = checkY
@@ -215,7 +210,7 @@ func (r Rows) String() string {
 	for _, row := range r {
 		s += row + "\n"
 	}
-	return s
+	return s[:len(s)-1]
 }
 
 func part2(rows Rows) (int, error) {
@@ -225,8 +220,9 @@ func part2(rows Rows) (int, error) {
 		var newOccupiedCount int
 		rows, newOccupiedCount = nextIteration(rows, occupiedCountRays, 5)
 
-		trace("after round %d: %d occupied seats", numRounds, occupiedCount)
-		fmt.Println(rows)
+		trace("%v", rows)
+		trace("after round %d: %d occupied seats\n", numRounds+1, occupiedCount)
+
 		if newOccupiedCount == occupiedCount {
 			break
 		}
