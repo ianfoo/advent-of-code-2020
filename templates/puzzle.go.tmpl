@@ -6,10 +6,14 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"io"
+	"log"
 	"os"
 )
+
+var verbose bool
 
 func main() {
 	flag.BoolVar(&verbose, "verbose", false, "Print more detail.")
@@ -25,7 +29,7 @@ func main() {
 
 func trace(format string, params ...interface{}) {
 	if verbose {
-		log.Printf(format, params...)
+		fmt.Printf(format+"\n", params...)
 	}
 }
 
@@ -35,21 +39,26 @@ func run(r io.Reader) error {
 		return fmt.Errorf("reading input: %w", err)
 	}
 
+	var part1Result int
 	{
-		result, err := part1(input)
+		var err error
+		part1Result, err = part1(input)
 		if err != nil {
 			return fmt.Errorf("part 1: %w", err)
 		}
-		fmt.Printf("Part 1: %d\n", result)
 	}
 
+	var part2Result int
 	{
-		result, err := part2(input)
+		var err error
+		part2Result, err = part2(input)
 		if err != nil {
 			return fmt.Errorf("part 2: %w", err)
 		}
-		fmt.Printf("Part 2: %d\n", result)
 	}
+
+	fmt.Printf("Part 1: %d\n", part1Result)
+	fmt.Printf("Part 2: %d\n", part2Result)
 
 	return nil
 }
