@@ -8,7 +8,7 @@ run-all:
 	done
 
 leaderboard:
-	go run admin.go leaderboard --id $(AOC_PRIVATE_LEADERBOARD_ID) 
+	go run admin.go leaderboard --id $(AOC_LEADERBOARD_ID) 
 
 init-next:
 	go run admin.go bootstrap
