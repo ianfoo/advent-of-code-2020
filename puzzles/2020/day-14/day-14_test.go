@@ -51,11 +51,11 @@ func TestNewMask(t *testing.T) {
 			in:      []int64{1024, 1, 0},
 			want:    []int64{4104, 4104, 4104},
 		},
-
-		// 	{64, 32},
-
-		// {0, 32},
-		// {128, 160},
+		{
+			maskStr: makeMaskStr([]int{7}, []int{6}),
+			in:      []int64{64, 0, 128},
+			want:    []int64{32, 32, 160},
+		},
 	}
 
 	for i, tc := range tt {
@@ -77,5 +77,4 @@ func TestNewMask(t *testing.T) {
 			}
 		})
 	}
-
 }

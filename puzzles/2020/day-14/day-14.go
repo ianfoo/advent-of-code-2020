@@ -9,6 +9,8 @@ import (
 	"io"
 	"log"
 	"os"
+	"strconv"
+	"strings"
 )
 
 var verbose bool
@@ -37,7 +39,7 @@ func run(r io.Reader) error {
 		return fmt.Errorf("reading input: %w", err)
 	}
 
-	var part1Result int
+	var part1Result int64
 	{
 		var err error
 		part1Result, err = part1(input)
@@ -116,12 +118,68 @@ func NewMask(s string) (Mask, error) {
 	return m, nil
 }
 
-func part1(input []string) (int, error) {
-	var result int
+func runProgram(input []string) (map[int64]int64, error) {
+	var (
+		mask Mask
+		mem  = make(map[int64]int64)
+	)
+	for i, line := range input {
+		tokens := strings.Split(line, " = ")
+		if len(tokens) != 2 {
+			return nil, fmt.Errorf("invalid input: %q", line)
+		}
+		if tokens[0] == "mask" {
+			var err error
+			mask, err = NewMask(tokens[1])
+			if err != nil {
+				return nil, err
+			}
+			continue
+		}
+		if !strings.HasPrefix(tokens[0], "mem") {
+			return nil, fmt.Errorf("invalid input: %q", line)
+		}
 
-	// Write the code to complete part one of the puzzle here.
+		var addr int64
+		{
+			instr := tokens[0]
+			instr = strings.TrimPrefix(instr, "mem[")
+			instr = strings.TrimSuffix(instr, "]")
 
-	return result, nil
+			var err error
+			addr, err = strconv.ParseInt(instr, 0, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid memory address %q on line %d: %w", instr, i+1, err)
+			}
+		}
+
+		var value int64
+		{
+			valueStr := tokens[1]
+			var err error
+			value, err = strconv.ParseInt(valueStr, 0, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid value %q on line %d: %w", valueStr, i+1, err)
+			}
+		}
+
+		value = mask.Apply(value)
+		mem[addr] = value
+	}
+
+	return mem, nil
+}
+
+func part1(input []string) (int64, error) {
+	mem, err := runProgram(input)
+	if err != nil {
+		return 0, err
+	}
+	var sum int64
+	for _, v := range mem {
+		sum += v
+	}
+	return sum, nil
 }
 
 func part2(input []string) (int, error) {
