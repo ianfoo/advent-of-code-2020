@@ -39,19 +39,24 @@ func run(r io.Reader) error {
 		return fmt.Errorf("reading input: %w", err)
 	}
 
+	instructions, err := parseProgram(input)
+	if err != nil {
+		return fmt.Errorf("parsing program: %w", err)
+	}
+
 	var part1Result int64
 	{
 		var err error
-		part1Result, err = part1(input)
+		part1Result, err = part1(instructions)
 		if err != nil {
 			return fmt.Errorf("part 1: %w", err)
 		}
 	}
 
-	var part2Result int
+	var part2Result int64
 	{
 		var err error
-		part2Result, err = part2(input)
+		part2Result, err = part2(instructions)
 		if err != nil {
 			return fmt.Errorf("part 2: %w", err)
 		}
@@ -78,18 +83,74 @@ func readInput(r io.Reader) ([]string, error) {
 	return input, nil
 }
 
-type Mask struct {
+type Instruction struct {
+	Type    int
+	Payload string
+	Addr    int64
+}
+
+const (
+	SetMaskInstruction = iota + 1
+	SetMemInstruction
+)
+
+func parseProgram(input []string) ([]Instruction, error) {
+	instructions := make([]Instruction, 0, len(input))
+	for i, line := range input {
+		tokens := strings.Split(line, " = ")
+		if len(tokens) != 2 {
+			return nil, fmt.Errorf("invalid input: %q", line)
+		}
+
+		op, payload := tokens[0], tokens[1]
+
+		if op == "mask" {
+			instr := Instruction{
+				Type:    SetMaskInstruction,
+				Payload: payload,
+			}
+			instructions = append(instructions, instr)
+			continue
+		}
+		if !strings.HasPrefix(op, "mem") {
+			return nil, fmt.Errorf("invalid input: %q", line)
+		}
+
+		var addr int64
+		{
+			addrStr := op
+			addrStr = strings.TrimPrefix(addrStr, "mem[")
+			addrStr = strings.TrimSuffix(addrStr, "]")
+
+			var err error
+			addr, err = strconv.ParseInt(addrStr, 0, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid memory address %q on line %d: %w", addrStr, i+1, err)
+			}
+		}
+		instr := Instruction{
+			Type:    SetMemInstruction,
+			Addr:    addr,
+			Payload: payload,
+		}
+		instructions = append(instructions, instr)
+	}
+
+	return instructions, nil
+}
+
+type MaskV1 struct {
 	And int64
 	Or  int64
 }
 
-func (m Mask) Apply(n int64) int64 {
+func (m MaskV1) Apply(n int64) int64 {
 	n &= m.And
 	n |= m.Or
 	return n
 }
 
-func NewMask(s string) (Mask, error) {
+func NewMaskV1(s string) (MaskV1, error) {
 	const (
 		bits        = 36
 		binaryOnes  = int64(2<<(bits-1) - 1)
@@ -108,73 +169,44 @@ func NewMask(s string) (Mask, error) {
 		case 'X':
 			// no-op
 		default:
-			return Mask{}, fmt.Errorf("invalid mask %q", s)
+			return MaskV1{}, fmt.Errorf("invalid mask %q", s)
 		}
 	}
-	m := Mask{
+	m := MaskV1{
 		And: and,
 		Or:  or,
 	}
 	return m, nil
 }
 
-func runProgram(input []string) (map[int64]int64, error) {
+func part1(instructions []Instruction) (int64, error) {
 	var (
-		mask Mask
+		mask MaskV1
 		mem  = make(map[int64]int64)
 	)
-	for i, line := range input {
-		tokens := strings.Split(line, " = ")
-		if len(tokens) != 2 {
-			return nil, fmt.Errorf("invalid input: %q", line)
-		}
-		if tokens[0] == "mask" {
-			var err error
-			mask, err = NewMask(tokens[1])
+	for i, instr := range instructions {
+		var err error
+		if instr.Type == SetMaskInstruction {
+			mask, err = NewMaskV1(instr.Payload)
 			if err != nil {
-				return nil, err
+				return 0, err
 			}
 			continue
-		}
-		if !strings.HasPrefix(tokens[0], "mem") {
-			return nil, fmt.Errorf("invalid input: %q", line)
-		}
-
-		var addr int64
-		{
-			instr := tokens[0]
-			instr = strings.TrimPrefix(instr, "mem[")
-			instr = strings.TrimSuffix(instr, "]")
-
-			var err error
-			addr, err = strconv.ParseInt(instr, 0, 64)
-			if err != nil {
-				return nil, fmt.Errorf("invalid memory address %q on line %d: %w", instr, i+1, err)
-			}
 		}
 
 		var value int64
 		{
-			valueStr := tokens[1]
+			valueStr := instr.Payload
 			var err error
 			value, err = strconv.ParseInt(valueStr, 0, 64)
 			if err != nil {
-				return nil, fmt.Errorf("invalid value %q on line %d: %w", valueStr, i+1, err)
+				return 0, fmt.Errorf("invalid value %q on line %d: %w", valueStr, i+1, err)
 			}
 		}
-
 		value = mask.Apply(value)
-		mem[addr] = value
+		mem[instr.Addr] = value
 	}
 
-	return mem, nil
-}
-
-func part1(input []string) (int64, error) {
-	mem, err := runProgram(input)
-	if err != nil {
-		return 0, err
-	}
 	var sum int64
 	for _, v := range mem {
 		sum += v
@@ -182,10 +214,87 @@ func part1(input []string) (int64, error) {
 	return sum, nil
 }
 
-func part2(input []string) (int, error) {
-	var result int
+type MaskV2 struct {
+	Or        int64
+	FloatBits int64
+}
 
-	// Write the code to complete part two of the puzzle here.
+func NewMaskV2(s string) (MaskV2, error) {
+	const bits int = 36
+	var (
+		or        int64
+		floatBits int64
+	)
+	for n, ch := range s {
+		switch ch {
+		case '1':
+			or |= 1 << (bits - n - 1)
+		case 'X':
+			floatBits |= 1 << (bits - n - 1)
+		case '0':
+			// no-op
+		default:
+			return MaskV2{}, fmt.Errorf("invalid mask %q", s)
+		}
+	}
+	m := MaskV2{
+		Or:        or,
+		FloatBits: floatBits,
+	}
+	return m, nil
+}
 
-	return result, nil
+func (m MaskV2) SetValueAtAddresses(addr, val int64, mem map[int64]int64) {
+	addr |= m.Or
+	addr &^= m.FloatBits
+	m.setValueAtAddresses(0, 0, addr, val, mem)
+}
+
+func (m MaskV2) setValueAtAddresses(exp int, sum, addr, val int64, mem map[int64]int64) {
+	if 1<<exp > m.FloatBits {
+		newAddr := addr + sum
+		mem[newAddr] = val
+		trace("setting value %d at address %d", val, newAddr)
+		return
+	}
+	m.setValueAtAddresses(exp+1, sum, addr, val, mem)
+	if n := int64(1 << exp); m.FloatBits&n != 0 {
+		sum += n
+		m.setValueAtAddresses(exp+1, sum, addr, val, mem)
+	}
+}
+
+func part2(instructions []Instruction) (int64, error) {
+	var (
+		mask MaskV2
+		mem  = make(map[int64]int64)
+	)
+	for i, instr := range instructions {
+		var err error
+		if instr.Type == SetMaskInstruction {
+			mask, err = NewMaskV2(instr.Payload)
+			if err != nil {
+				return 0, err
+			}
+			trace("new mask: %s", instr.Payload)
+			continue
+		}
+
+		var value int64
+		{
+			valueStr := instr.Payload
+			var err error
+			value, err = strconv.ParseInt(valueStr, 0, 64)
+			if err != nil {
+				return 0, fmt.Errorf("invalid value %q on line %d: %w", valueStr, i+1, err)
+			}
+		}
+		mask.SetValueAtAddresses(instr.Addr, value, mem)
+	}
+
+	var sum int64
+	for _, v := range mem {
+		sum += v
+	}
+	return sum, nil
 }

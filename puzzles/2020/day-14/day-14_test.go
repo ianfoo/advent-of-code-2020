@@ -61,7 +61,7 @@ func TestNewMask(t *testing.T) {
 	for i, tc := range tt {
 		t.Run(fmt.Sprintf("Test %d", i+1), func(t *testing.T) {
 			t.Logf("maskStr: %s (len: %d)", tc.maskStr, len(tc.maskStr))
-			m, err := NewMask(tc.maskStr)
+			m, err := NewMaskV1(tc.maskStr)
 			t.Logf("And: %036b (%d)", m.And, m.And)
 			t.Logf("Or:  %036b (%d)", m.Or, m.Or)
 			if err != nil {
